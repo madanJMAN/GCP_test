@@ -1,87 +1,89 @@
-name: Deploy BigQuery Stored Procedures 
- 
-on: 
-  push: 
-    branches: [dev, uat, main] 
-    paths: 
-      - '**/*.sql' 
- 
-permissions: 
-  contents: 'read' 
-  id-token: 'write'   # required for Workload Identity Federation 
- 
-jobs: 
-  # ---------- CI: validate every changed SQL file first ---------- 
-  validate: 
-    runs-on: ubuntu-latest 
-    steps: 
-      - name: Checkout repo 
-        uses: actions/checkout@v4 
-        with: 
-          fetch-depth: 2 
- 
+name: Deploy BigQuery Stored Procedures
+
+on:
+  push:
+    branches: [dev, uat, main]
+    paths:
+      - '**/*.sql'
+
+permissions:
+  contents: 'read'
+  id-token: 'write'   # required for Workload Identity Federation
+
+jobs:
+  # ---------- CI: validate every changed SQL file first ----------
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
       - name: Set environment variables
         run: |
-           echo "PROJECT_ID=data-warehouse-495308" >> $GITHUB_ENV
-           echo "ENV_NAME=${{ github.ref_name }}" >> $GITHUB_ENV
-                    
- 
-      - name: Authenticate to GCP (Workload Identity Federation) 
-        uses: google-github-actions/auth@v2 
-        with: 
-          workload_identity_provider: 'projects/${{ vars.GCP_PROJECT_NUMBER }}/locations/global/workloadIdentityPools/${{ vars.GCP_WIF_POOL }}/providers/${{ vars.GCP_WIF_PROVIDER }}' 
-          service_account: 'github-actions-deployer@${{ env.PROJECT_ID }}.iam.gserviceaccount.com' 
- 
-      - name: Set up gcloud 
-        uses: google-github-actions/setup-gcloud@v2 
- 
-      - name: Dry-run changed SQL files 
-        run: | 
-          CHANGED_FILES=$(git diff --name-only HEAD^ HEAD -- '*.sql') 
-          echo "Changed files: $CHANGED_FILES" 
-          if [ -z "$CHANGED_FILES" ]; then 
-            echo "No SQL files changed." 
-            exit 0 
-          fi 
-          for file in $CHANGED_FILES; do 
-            echo "Validating $file (dry run, no changes applied)" 
-            bq query --project_id=$PROJECT_ID --use_legacy_sql=false --dry_run < "$file" 
-          done 
- 
-  # ---------- CD: deploy only if validation passed ---------- 
-  deploy: 
-    needs: validate 
-    runs-on: ubuntu-latest 
-    environment: ${{ github.ref_name == 'main' && 'prod' || github.ref_name }} 
-    steps: 
-      - name: Checkout repo 
-        uses: actions/checkout@v4 
-        with: 
-          fetch-depth: 2 
- 
+          echo "PROJECT_ID=data-warehouse-495308" >> $GITHUB_ENV
+          echo "ENV_NAME=${{ github.ref_name }}" >> $GITHUB_ENV
+
+      - name: Authenticate to GCP (Workload Identity Federation)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: 'projects/${{ vars.GCP_PROJECT_NUMBER }}/locations/global/workloadIdentityPools/${{ vars.GCP_WIF_POOL }}/providers/${{ vars.GCP_WIF_PROVIDER }}'
+          service_account: 'github-actions-deployer@${{ env.PROJECT_ID }}.iam.gserviceaccount.com'
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Dry-run changed SQL files
+        run: |
+          CHANGED_FILES=$(git diff --name-only HEAD^ HEAD -- '*.sql')
+          echo "Changed files: $CHANGED_FILES"
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "No SQL files changed."
+            exit 0
+          fi
+          for file in $CHANGED_FILES; do
+            echo "Validating $file (dry run, no changes applied)"
+            bq query --project_id=$PROJECT_ID --use_legacy_sql=false --dry_run < "$file"
+          done
+
+  # ---------- CD: deploy only if validation passed ----------
+  deploy:
+    needs: validate
+    runs-on: ubuntu-latest
+    environment: ${{ github.ref_name == 'main' && 'prod' || github.ref_name }}
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
       - name: Set environment variables
         run: |
-           echo "PROJECT_ID=data-warehouse-495308" >> $GITHUB_ENV
-           echo "ENV_NAME=${{ github.ref_name }}" >> $GITHUB_ENV
- 
-      - name: Authenticate to GCP (Workload Identity Federation) 
-        uses: google-github-actions/auth@v2 
-        with: 
-          workload_identity_provider: 'projects/${{ vars.GCP_PROJECT_NUMBER }}/locations/global/workloadIdentityPools/${{ vars.GCP_WIF_POOL }}/providers/${{ vars.GCP_WIF_PROVIDER }}' 
-          service_account: 'github-actions-deployer@${{ env.PROJECT_ID }}.iam.gserviceaccount.com' 
- 
-      - name: Set up gcloud 
-        uses: google-github-actions/setup-gcloud@v2 
- 
-      - name: Deploy changed SQL files (in layer order) 
-        run: | 
-          for folder in 01_raw 02_stg 03_core 04_datamart 05_reporting; do 
-            FILES=$(git diff --name-only HEAD^ HEAD -- "${folder}/*.sql" 2>/dev/null || true) 
-            for file in $FILES; do 
-              echo "Deploying $file to $PROJECT_ID" 
-              bq query --project_id=$PROJECT_ID --use_legacy_sql=false < "$file" 
-            done 
-          done 
- 
-      - name: Deploy summary 
-        run: echo "✅ Deployment to $ENV_NAME ($PROJECT_ID) complete." 
+          echo "PROJECT_ID=data-warehouse-495308" >> $GITHUB_ENV
+          echo "ENV_NAME=${{ github.ref_name }}" >> $GITHUB_ENV
+
+      - name: Authenticate to GCP (Workload Identity Federation)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: 'projects/${{ vars.GCP_PROJECT_NUMBER }}/locations/global/workloadIdentityPools/${{ vars.GCP_WIF_POOL }}/providers/${{ vars.GCP_WIF_PROVIDER }}'
+          service_account: 'github-actions-deployer@${{ env.PROJECT_ID }}.iam.gserviceaccount.com'
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy changed SQL files
+        run: |
+          CHANGED_FILES=$(git diff --name-only HEAD^ HEAD -- '*.sql')
+          echo "Changed files: $CHANGED_FILES"
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "No SQL files changed."
+            exit 0
+          fi
+          for file in $CHANGED_FILES; do
+            echo "Deploying $file to $PROJECT_ID"
+            bq query --project_id=$PROJECT_ID --use_legacy_sql=false < "$file"
+          done
+
+      - name: Deploy summary
+        run: echo "✅ Deployment to $ENV_NAME ($PROJECT_ID) complete."
