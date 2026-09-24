@@ -3,4 +3,4 @@ SELECT
     'madan' AS test1,
     'raj' AS test2,
     'madan raj' AS col,
-    'M A' AS initials;
+    'M A' AS initial;
